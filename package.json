@@ -1,0 +1,19 @@
+{
+  "name": "foodbridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FoodBridge food donation platform",
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names API,WEB \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "build": "npm run build --prefix frontend",
+    "api:check": "node --check backend/src/index.js",
+    "admin:create": "npm run admin:create --prefix backend",
+    "db:seed": "npm run db:seed --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "lucide-react": "^0.436.0"
+  }
+}
