@@ -3,8 +3,9 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const path = require('path');
 const crypto = require('crypto');
+const { Resend } = require('resend');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
-
+const resend = new Resend(process.env.RESEND_API_KEY);
 const VALID_ROLES = ['donor', 'ngo'];
 
 function signToken(user) {
@@ -130,10 +131,34 @@ async function forgotPassword(req, res) {
 
     // For local/demo testing only.
     // Later we can replace this with an actual email.
-    res.json({
-      message: 'Password reset link created.',
-      resetToken
-    });
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+const { data, error } = await resend.emails.send({
+  from: 'onboarding@resend.dev',
+  to: email,
+  subject: 'FoodBridge Password Reset',
+  html: `
+    <h2>Reset your FoodBridge password</h2>
+    <p>You requested a password reset.</p>
+    <p>
+      <a href="${resetUrl}">Click here to reset your password</a>
+    </p>
+    <p>This link will expire in 15 minutes.</p>
+  `,
+});
+
+if (error) {
+  console.error('RESEND ERROR:', error);
+  return res.status(500).json({
+    error: 'Could not send reset email'
+  });
+}
+
+console.log('RESEND SUCCESS:', data);
+
+res.json({
+  message: 'Password reset link sent to your email.'
+});
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Something went wrong' });

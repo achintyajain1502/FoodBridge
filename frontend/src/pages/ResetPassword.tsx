@@ -86,18 +86,12 @@ export function ResetPassword() {
 
         <form className="form-grid" onSubmit={handleSubmit}>
 
-          <div className="form-row">
-            <label htmlFor="token">Reset token</label>
-
-            <input
-              id="token"
-              type="text"
-              required
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="Paste your reset token"
-            />
-          </div>
+          {!token && (
+  <div className="banner banner-error">
+    <AlertCircle size={16} />
+    Invalid or missing reset link.
+  </div>
+)}
 
           <div className="form-row">
             <label htmlFor="newPassword">New password</label>
@@ -146,10 +140,9 @@ export function ResetPassword() {
           </button>
         </form>
 
-        <p style={{ marginTop: 20, fontSize: '0.9rem' }}>
-          Remember your password?{' '}
-          <Link to="/login">Back to login</Link>
-        </p>
+        <p style={{ color: 'var(--color-text-muted)' }}>
+  Choose a new password for your account.
+</p>
       </div>
     </AuthLayout>
   );
