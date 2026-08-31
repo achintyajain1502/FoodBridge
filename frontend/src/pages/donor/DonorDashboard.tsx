@@ -60,14 +60,16 @@ export function DonorDashboard() {
     }
   }
 
-  async function handleCancel(id: number) {
-    try {
-      await api.patch(`/donations/${id}/cancel`);
-      loadDonations();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not cancel donation');
-    }
+  async function handleCertificate(id: number) {
+  try {
+    const blob = await api.download(`/certificates/donation/${id}`);
+
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  } catch (err) {
+    setError(err instanceof ApiError ? err.message : 'Could not get certificate');
   }
+}
 
   return (
     <DashboardLayout title="Post & track" subtitle="Post surplus food and follow it through to completion.">
@@ -199,12 +201,23 @@ export function DonorDashboard() {
                   </div>
                 )}
                 {d.status === 'available' && (
-                  <div className="donation-actions">
-                    <button className="btn btn-danger btn-sm" onClick={() => handleCancel(d.id)}>
-                      Cancel
-                    </button>
-                  </div>
-                )}
+  <div className="donation-actions">
+    <button className="btn btn-danger btn-sm" onClick={() => handleCancel(d.id)}>
+      Cancel
+    </button>
+  </div>
+)}
+
+{d.status === 'completed' && (
+  <div className="donation-actions">
+    <button
+  className="btn btn-accent btn-sm"
+  onClick={() => handleCertificate(d.id)}
+>
+  Get Certificate
+</button>
+  </div>
+)}
               </div>
             ))
           )}

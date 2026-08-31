@@ -6,6 +6,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const authRoutes = require('./routes/auth');
 const donationRoutes = require('./routes/donations');
 const adminRoutes = require('./routes/admin');
+const certificateRoutes = require('./routes/certificates');
 
 const app = express();
 
@@ -17,7 +18,7 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/donations', donationRoutes);
 app.use('/api/admin', adminRoutes);
-
+app.use('/api/certificates', certificateRoutes);
 // 404 handler
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 
