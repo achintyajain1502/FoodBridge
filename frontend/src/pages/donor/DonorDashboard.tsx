@@ -70,6 +70,14 @@ export function DonorDashboard() {
     setError(err instanceof ApiError ? err.message : 'Could not get certificate');
   }
 }
+async function handleCancel(id: number) {
+  try {
+    await api.patch(`/donations/${id}/cancel`);
+    loadDonations();
+  } catch (err) {
+    setError(err instanceof ApiError ? err.message : 'Could not cancel donation');
+  }
+}
 
   return (
     <DashboardLayout title="Post & track" subtitle="Post surplus food and follow it through to completion.">
