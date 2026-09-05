@@ -3,10 +3,41 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const path = require('path');
 const crypto = require('crypto');
-const { Resend } = require('resend');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
-const resend = new Resend(process.env.RESEND_API_KEY);
 const VALID_ROLES = ['donor', 'ngo'];
+
+async function sendPasswordResetEmail(recipient, resetUrl) {
+  const { BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME = 'FoodBridge' } = process.env;
+
+  if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) {
+    throw new Error('BREVO_API_KEY and BREVO_SENDER_EMAIL must be configured');
+  }
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'api-key': BREVO_API_KEY
+    },
+    body: JSON.stringify({
+      sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
+      to: [{ email: recipient }],
+      subject: 'FoodBridge Password Reset',
+      htmlContent: `
+        <h2>Reset your FoodBridge password</h2>
+        <p>You requested a password reset.</p>
+        <p><a href="${resetUrl}">Click here to reset your password</a></p>
+        <p>This link will expire in 15 minutes.</p>
+      `
+    })
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Brevo email request failed (${response.status}): ${errorBody}`);
+  }
+}
 
 function signToken(user) {
   return jwt.sign(
@@ -129,36 +160,17 @@ async function forgotPassword(req, res) {
       [resetToken, result.rows[0].id]
     );
 
-    // For local/demo testing only.
-    // Later we can replace this with an actual email.
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const frontendUrl = process.env.FRONTEND_URL?.replace(/\/+$/, '');
+    if (!frontendUrl) {
+      throw new Error('FRONTEND_URL must be configured');
+    }
 
-const { data, error } = await resend.emails.send({
-  from: 'onboarding@resend.dev',
-  to: email,
-  subject: 'FoodBridge Password Reset',
-  html: `
-    <h2>Reset your FoodBridge password</h2>
-    <p>You requested a password reset.</p>
-    <p>
-      <a href="${resetUrl}">Click here to reset your password</a>
-    </p>
-    <p>This link will expire in 15 minutes.</p>
-  `,
-});
+    const resetUrl = `${frontendUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+    await sendPasswordResetEmail(email, resetUrl);
 
-if (error) {
-  console.error('RESEND ERROR:', error);
-  return res.status(500).json({
-    error: 'Could not send reset email'
-  });
-}
-
-console.log('RESEND SUCCESS:', data);
-
-res.json({
-  message: 'Password reset link sent to your email.'
-});
+    res.json({
+      message: 'Password reset link sent to your email.'
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Something went wrong' });
