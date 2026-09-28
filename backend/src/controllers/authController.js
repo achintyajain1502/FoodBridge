@@ -8,6 +8,39 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const VALID_ROLES = ['donor', 'ngo'];
 
+async function sendPasswordResetEmail(recipient, resetUrl) {
+  const { BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME = 'FoodBridge' } = process.env;
+
+  if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) {
+    throw new Error('BREVO_API_KEY and BREVO_SENDER_EMAIL must be configured');
+  }
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'api-key': BREVO_API_KEY
+    },
+    body: JSON.stringify({
+      sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
+      to: [{ email: recipient }],
+      subject: 'FoodBridge Password Reset',
+      htmlContent: `
+        <h2>Reset your FoodBridge password</h2>
+        <p>You requested a password reset.</p>
+        <p><a href="${resetUrl}">Click here to reset your password</a></p>
+        <p>This link will expire in 15 minutes.</p>
+      `
+    })
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Brevo email request failed (${response.status}): ${errorBody}`);
+  }
+}
+
 function signToken(user) {
   return jwt.sign(
     { id: user.id, role: user.role, name: user.name, email: user.email },
@@ -134,87 +167,13 @@ async function forgotPassword(req, res) {
        WHERE id = $2`,
       [resetToken, result.rows[0].id]
     );
-
     const resetUrl =
       `${frontendUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
 
-    const brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'api-key': BREVO_API_KEY
-      },
-      body: JSON.stringify({
-        sender: {
-          email: BREVO_SENDER_EMAIL,
-          name: process.env.BREVO_SENDER_NAME || 'FoodBridge'
-        },
-        to: [{ email }],
-        subject: 'FoodBridge Password Reset',
-        htmlContent: `
-          <h2>Reset your FoodBridge password</h2>
-          <p>You requested a password reset.</p>
-          <p><a href="${resetUrl}">Click here to reset your password</a></p>
-          <p>This link expires in 15 minutes.</p>
-        `
-      })
-    });
-
-    if (!brevoResponse.ok) {
-      throw new Error(`Brevo failed: ${await brevoResponse.text()}`);
-    }
-
-    res.json({ message: 'Password reset link sent to your email.' });
-  } catch (err) {
-    console.error('Password-reset email error:', err.message);
-    res.status(500).json({ error: 'Could not send reset email' });
-  }
-}
-// POST /api/auth/reset-password
-async function resetPassword(req, res) {
-  try {
-    const { token, newPassword } = req.body;
-
-    if (!token || !newPassword) {
-      return res.status(400).json({
-        error: 'Token and new password are required'
-      });
-    }
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({
-        error: 'Password must be at least 6 characters'
-      });
-    }
-
-    const result = await pool.query(
-      `SELECT id
-       FROM users
-       WHERE reset_token = $1
-       AND reset_token_expires_at > NOW()`,
-      [token]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(400).json({
-        error: 'Invalid or expired reset token'
-      });
-    }
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-
-    await pool.query(
-      `UPDATE users
-       SET password_hash = $1,
-           reset_token = NULL,
-           reset_token_expires_at = NULL
-       WHERE id = $2`,
-      [passwordHash, result.rows[0].id]
-    );
+    await sendPasswordResetEmail(email, resetUrl);
 
     res.json({
-      message: 'Password reset successfully'
+      message: 'Password reset link sent to your email.'
     });
   } catch (err) {
     console.error(err);

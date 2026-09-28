@@ -63,11 +63,22 @@ NODE_ENV=production
 DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 JWT_SECRET=<long-random-secret>
 JWT_EXPIRES_IN=7d
+BREVO_API_KEY=<brevo-api-key>
+BREVO_SENDER_EMAIL=<verified-brevo-sender-email>
+BREVO_SENDER_NAME=FoodBridge
+FRONTEND_URL=https://app.example.com
 ```
 
 Do not use the local `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, or
 `DB_PASSWORD` fallback in production. After setting `DATABASE_URL`, run
 `npm run db:init --prefix backend` once against the hosted database.
+
+### Password-reset email
+
+Password-reset emails are sent through Brevo. Create a Brevo API key and set
+`BREVO_API_KEY`; `BREVO_SENDER_EMAIL` must be a verified sender in Brevo.
+Set `FRONTEND_URL` to the public frontend origin so reset links point to the
+correct `/reset-password` page.
 
 ### API summary
 
