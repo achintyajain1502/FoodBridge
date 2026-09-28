@@ -3,9 +3,9 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const path = require('path');
 const crypto = require('crypto');
-const { Resend } = require('resend');
+
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
-const resend = new Resend(process.env.RESEND_API_KEY);
+
 const VALID_ROLES = ['donor', 'ngo'];
 
 function signToken(user) {
@@ -112,11 +112,17 @@ async function forgotPassword(req, res) {
       [email]
     );
 
-    // Don't reveal whether an email exists
     if (result.rows.length === 0) {
       return res.json({
         message: 'If an account exists with this email, a reset link has been created.'
       });
+    }
+
+    const { BREVO_API_KEY, BREVO_SENDER_EMAIL } = process.env;
+    const frontendUrl = process.env.FRONTEND_URL?.replace(/\/+$/, '');
+
+    if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL || !frontendUrl) {
+      throw new Error('Brevo email settings are missing in backend/.env');
     }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -129,39 +135,40 @@ async function forgotPassword(req, res) {
       [resetToken, result.rows[0].id]
     );
 
-    // For local/demo testing only.
-    // Later we can replace this with an actual email.
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const resetUrl =
+      `${frontendUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
 
-const { data, error } = await resend.emails.send({
-  from: 'onboarding@resend.dev',
-  to: email,
-  subject: 'FoodBridge Password Reset',
-  html: `
-    <h2>Reset your FoodBridge password</h2>
-    <p>You requested a password reset.</p>
-    <p>
-      <a href="${resetUrl}">Click here to reset your password</a>
-    </p>
-    <p>This link will expire in 15 minutes.</p>
-  `,
-});
+    const brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'api-key': BREVO_API_KEY
+      },
+      body: JSON.stringify({
+        sender: {
+          email: BREVO_SENDER_EMAIL,
+          name: process.env.BREVO_SENDER_NAME || 'FoodBridge'
+        },
+        to: [{ email }],
+        subject: 'FoodBridge Password Reset',
+        htmlContent: `
+          <h2>Reset your FoodBridge password</h2>
+          <p>You requested a password reset.</p>
+          <p><a href="${resetUrl}">Click here to reset your password</a></p>
+          <p>This link expires in 15 minutes.</p>
+        `
+      })
+    });
 
-if (error) {
-  console.error('RESEND ERROR:', error);
-  return res.status(500).json({
-    error: 'Could not send reset email'
-  });
-}
+    if (!brevoResponse.ok) {
+      throw new Error(`Brevo failed: ${await brevoResponse.text()}`);
+    }
 
-console.log('RESEND SUCCESS:', data);
-
-res.json({
-  message: 'Password reset link sent to your email.'
-});
+    res.json({ message: 'Password reset link sent to your email.' });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Something went wrong' });
+    console.error('Password-reset email error:', err.message);
+    res.status(500).json({ error: 'Could not send reset email' });
   }
 }
 // POST /api/auth/reset-password
