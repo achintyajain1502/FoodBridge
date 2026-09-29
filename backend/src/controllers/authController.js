@@ -228,12 +228,12 @@ async function resetPassword(req, res) {
     res.json({
       message: 'Password reset successfully'
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: 'Something went wrong'
-    });
-  }
+  }  catch (err) {
+  console.error(err);
+  res.status(500).json({
+    error: err.message
+  });
+}
 }
 module.exports = {
   register,
