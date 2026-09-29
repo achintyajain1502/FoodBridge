@@ -181,6 +181,59 @@ async function forgotPassword(req, res) {
       error: 'Something went wrong'
     });
   }
+  
+}
+// POST /api/auth/reset-password
+async function resetPassword(req, res) {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        error: 'Token and new password are required'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        error: 'Password must be at least 6 characters'
+      });
+    }
+
+    const result = await pool.query(
+      `SELECT id
+       FROM users
+       WHERE reset_token = $1
+       AND reset_token_expires_at > NOW()`,
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid or expired reset token'
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await pool.query(
+      `UPDATE users
+       SET password_hash = $1,
+           reset_token = NULL,
+           reset_token_expires_at = NULL
+       WHERE id = $2`,
+      [passwordHash, result.rows[0].id]
+    );
+
+    res.json({
+      message: 'Password reset successfully'
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: 'Something went wrong'
+    });
+  }
 }
 module.exports = {
   register,
