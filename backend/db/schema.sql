@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS donations (
     status          donation_status NOT NULL DEFAULT 'available',
     created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
     accepted_at     TIMESTAMP,
-    completed_at    TIMESTAMP
+    completed_at    TIMESTAMP,
+    certificate_allowed BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Audit trail for status changes (useful for "donation history" screens)
@@ -58,13 +59,3 @@ CREATE INDEX IF NOT EXISTS idx_donations_status_city ON donations(status, city);
 CREATE INDEX IF NOT EXISTS idx_donations_donor ON donations(donor_id);
 CREATE INDEX IF NOT EXISTS idx_donations_ngo ON donations(ngo_id);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-CREATE TABLE IF NOT EXISTS certificates (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role user_role NOT NULL,
-    certificate_type VARCHAR(50) NOT NULL,
-    generated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    published BOOLEAN NOT NULL DEFAULT FALSE
-);
-
-CREATE INDEX IF NOT EXISTS idx_certificates_user ON certificates(user_id);

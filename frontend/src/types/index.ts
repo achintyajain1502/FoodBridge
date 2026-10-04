@@ -29,6 +29,7 @@ export interface Donation {
   created_at: string;
   accepted_at?: string | null;
   completed_at?: string | null;
+  certificate_allowed: boolean;
   donor_name?: string;
   donor_phone?: string;
   ngo_name?: string;

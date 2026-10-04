@@ -75,6 +75,34 @@ async function listAllDonations(req, res) {
   }
 }
 
+
+// PATCH /api/admin/donations/:id/certificate
+// Admin allows certificate generation for a completed donation.
+async function allowCertificate(req, res) {
+  try {
+    const { id } = req.params;
+    const existing = await pool.query(
+      'SELECT id, status, certificate_allowed FROM donations WHERE id = $1',
+      [id]
+    );
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Donation not found' });
+
+    const donation = existing.rows[0];
+    if (donation.status !== 'completed') {
+      return res.status(409).json({ error: 'Certificate can only be allowed for completed donations' });
+    }
+
+    const result = await pool.query(
+      `UPDATE donations SET certificate_allowed = TRUE WHERE id = $1 RETURNING id, status, certificate_allowed`,
+      [id]
+    );
+    res.json({ donation: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not allow certificate' });
+  }
+}
+
 // GET /api/admin/stats  (simple dashboard counters)
 async function getStats(req, res) {
   try {
@@ -94,106 +122,5 @@ async function getStats(req, res) {
     res.status(500).json({ error: 'Could not fetch stats' });
   }
 }
-// GET /api/admin/certificates/candidates
-// Finds the current Best Donor and Best NGO based on completed donations
-async function getCertificateCandidates(req, res) {
-  try {
-    const donors = await pool.query(`
-      SELECT
-        u.id,
-        u.name,
-        u.role,
-        COUNT(d.id) AS completed_donations
-      FROM users u
-      JOIN donations d ON d.donor_id = u.id
-      WHERE u.role = 'donor'
-        AND d.status = 'completed'
-      GROUP BY u.id, u.name, u.role
-      ORDER BY completed_donations DESC
-      LIMIT 1
-    `);
 
-    const ngos = await pool.query(`
-      SELECT
-        u.id,
-        u.name,
-        u.role,
-        COUNT(d.id) AS completed_donations
-      FROM users u
-      JOIN donations d ON d.ngo_id = u.id
-      WHERE u.role = 'ngo'
-        AND d.status = 'completed'
-      GROUP BY u.id, u.name, u.role
-      ORDER BY completed_donations DESC
-      LIMIT 1
-    `);
-
-    res.json({
-      bestDonor: donors.rows[0] || null,
-      bestNgo: ngos.rows[0] || null,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not fetch certificate candidates' });
-  }
-}
-// POST /api/admin/certificates
-// Generate a certificate for the selected Best Donor or Best NGO
-async function generateCertificate(req, res) {
-  try {
-    const { user_id, role, certificate_type } = req.body;
-
-    if (!user_id || !role || !certificate_type) {
-      return res.status(400).json({
-        error: 'user_id, role and certificate_type are required',
-      });
-    }
-
-    if (!['donor', 'ngo'].includes(role)) {
-      return res.status(400).json({
-        error: 'Role must be donor or ngo',
-      });
-    }
-
-    if (!['best_donor', 'best_ngo'].includes(certificate_type)) {
-      return res.status(400).json({
-        error: 'Invalid certificate type',
-      });
-    }
-
-    const user = await pool.query(
-      `SELECT id, name, role FROM users WHERE id = $1 AND role = $2`,
-      [user_id, role]
-    );
-
-    if (user.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const result = await pool.query(
-      `INSERT INTO certificates (user_id, role, certificate_type)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [user_id, role, certificate_type]
-    );
-
-    res.status(201).json({
-      certificate: {
-        ...result.rows[0],
-        user_name: user.rows[0].name,
-      },
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not generate certificate' });
-  }
-}
-module.exports = {
-  listUsers,
-  verifyUser,
-  deleteUser,
-  listAllDonations,
-  getStats,
-  getCertificateCandidates,
-  generateCertificate,
-};
+module.exports = { listUsers, verifyUser, deleteUser, listAllDonations, allowCertificate, getStats };
