@@ -75,6 +75,34 @@ async function listAllDonations(req, res) {
   }
 }
 
+
+// PATCH /api/admin/donations/:id/certificate
+// Admin allows certificate generation for a completed donation.
+async function allowCertificate(req, res) {
+  try {
+    const { id } = req.params;
+    const existing = await pool.query(
+      'SELECT id, status, certificate_allowed FROM donations WHERE id = $1',
+      [id]
+    );
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Donation not found' });
+
+    const donation = existing.rows[0];
+    if (donation.status !== 'completed') {
+      return res.status(409).json({ error: 'Certificate can only be allowed for completed donations' });
+    }
+
+    const result = await pool.query(
+      `UPDATE donations SET certificate_allowed = TRUE WHERE id = $1 RETURNING id, status, certificate_allowed`,
+      [id]
+    );
+    res.json({ donation: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not allow certificate' });
+  }
+}
+
 // GET /api/admin/stats  (simple dashboard counters)
 async function getStats(req, res) {
   try {
@@ -95,4 +123,4 @@ async function getStats(req, res) {
   }
 }
 
-module.exports = { listUsers, verifyUser, deleteUser, listAllDonations, getStats };
+module.exports = { listUsers, verifyUser, deleteUser, listAllDonations, allowCertificate, getStats };

@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS donations (
     status          donation_status NOT NULL DEFAULT 'available',
     created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
     accepted_at     TIMESTAMP,
-    completed_at    TIMESTAMP
+    completed_at    TIMESTAMP,
+    certificate_allowed BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Audit trail for status changes (useful for "donation history" screens)
